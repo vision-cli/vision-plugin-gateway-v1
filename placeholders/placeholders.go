@@ -1,33 +1,33 @@
 package placeholders
 
 import (
-	"regexp"
+	"path/filepath"
 
+	"github.com/barkimedes/go-deepcopy"
 	api_v1 "github.com/vision-cli/api/v1"
+	"github.com/vision-cli/common/transpiler/model"
 )
 
 const (
 	ArgsCommandIndex = 0
 	ArgsNameIndex    = 1
-	// include any other arg indexes here
 )
 
-var nonAlphaRegex = regexp.MustCompile(`[^a-zA-Z]+`)
-
-type Placeholders struct {
-	Name string
-}
-
-func SetupPlaceholders(req api_v1.PluginRequest) (*Placeholders, error) {
-	// setup your placeholders here
-	// you can also deepcopy the Placeholders in the plugin request and use it
-	// this is just an example:
-	name := clearString(req.Args[ArgsNameIndex])
-	return &Placeholders{
-		Name: name,
-	}, nil
-}
-
-func clearString(str string) string {
-	return nonAlphaRegex.ReplaceAllString(str, "")
+func SetupPlaceholders(req api_v1.PluginRequest) (*api_v1.PluginPlaceholders, error) {
+	var err error
+	p, err := deepcopy.Anything(&req.Placeholders)
+	if err != nil {
+		return nil, err
+	}
+	err = model.NameErr(req.Args[ArgsNameIndex])
+	if err != nil {
+		return nil, err
+	}
+	serviceName := req.Args[ArgsNameIndex]
+	p.(*api_v1.PluginPlaceholders).ServiceName = serviceName
+	p.(*api_v1.PluginPlaceholders).ServiceDirectory = filepath.Join(
+		p.(*api_v1.PluginPlaceholders).ServicesDirectory,
+		p.(*api_v1.PluginPlaceholders).ServiceNamespace,
+		serviceName)
+	return p.(*api_v1.PluginPlaceholders), nil
 }
