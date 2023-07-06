@@ -29,38 +29,26 @@ const (
 var templateFiles embed.FS
 
 func Create(p *api_v1.PluginPlaceholders, executor execute.Executor, t tmpl.TmplWriter) error {
-	var err error
-
-	if file.Exists(p.ServiceDirectory) {
-		return fmt.Errorf("gateway %q already exists", p.GatewayServiceName)
-	}
-
-	if err = tmpl.GenerateFS(templateFiles, goTemplateDir, p.ServiceDirectory, p, false, t); err != nil {
-		return fmt.Errorf("generating the gateway service structure from the template: %w", err)
-	}
+	targetDir := filepath.Join(p.ServiceDirectory, p.ServiceFqn, p.ServiceName)
 
 	exposed, err := getExposedServices(p)
 	if err != nil {
 		return fmt.Errorf("finding exposed services: %w", err)
 	}
 
-	if err = createTemplate(p, t); err != nil {
-		return fmt.Errorf("generating service files with target dir: [%s]: %w", p.ServiceDirectory, err)
+	if err = createTemplate(p, targetDir, t); err != nil {
+		return fmt.Errorf("generating service files with target dir: [%s]: %w", targetDir, err)
 	}
-	if err = generateGrpcHandlerCode(p.ServiceDirectory, exposed); err != nil {
-		return fmt.Errorf("generating handler code with target dir: [%s]: %w", p.ServiceDirectory, err)
+	if err = generateGrpcHandlerCode(targetDir, exposed); err != nil {
+		return fmt.Errorf("generating handler code with target dir: [%s]: %w", targetDir, err)
 	}
-	if err = generateModFiles(p.ServiceDirectory, p.ServiceFqn, exposed, executor, p); err != nil {
-		return fmt.Errorf("generating module files with target dir: [%s]: %w", p.ServiceDirectory, err)
+	if err = generateModFiles(targetDir, p.ServiceFqn, exposed, executor, p); err != nil {
+		return fmt.Errorf("generating module files with target dir: [%s]: %w", targetDir, err)
 	}
-	if err = genWorkflow(p); err != nil {
-		return fmt.Errorf("generating service workflow with target dir: [%s]: %w", p.ServiceDirectory, err)
+	if err = GenWorkflow(p); err != nil {
+		return fmt.Errorf("generating service workflow with target dir: [%s]: %w", targetDir, err)
 	}
-	if err = workspace.Use(".", p.ServiceDirectory, executor); err != nil {
-		return fmt.Errorf("adding service to workspace: %w", err)
-	}
-
-	if err = workspace.Use(".", p.ServicesDirectory, executor); err != nil {
+	if err = workspace.Use(".", targetDir, executor); err != nil {
 		return fmt.Errorf("adding service to workspace: %w", err)
 	}
 
@@ -109,48 +97,18 @@ func getExposedServices(p *api_v1.PluginPlaceholders) ([]*serviceInfo, error) {
 	return exposed, nil
 }
 
-func createTemplate(p *api_v1.PluginPlaceholders, t tmpl.TmplWriter) error {
+func createTemplate(p *api_v1.PluginPlaceholders, targetDir string, t tmpl.TmplWriter) error {
+	// if !cmd.Flags().Changed(config.FlagForce) {
+	// 	if file.Exists(targetDir) && !cli.Confirmed(
+	// 		fmt.Sprintf("A service already exists named %s. Do you wish to overwrite?", p.ServiceName),
+	// 	) {
+	// 		return fmt.Errorf("aborting due to existing service named %s", p.ServiceName)
+	// 	}
+	// }
 
-	os.RemoveAll(p.ServiceDirectory)
-	if err := tmpl.GenerateFS(templateFiles, goTemplateDir, p.ServiceDirectory, p, false, t); err != nil {
+	os.RemoveAll(targetDir)
+	if err := tmpl.GenerateFS(templateFiles, goTemplateDir, targetDir, p, false, t); err != nil {
 		return fmt.Errorf("generating the service structure from the template: %w", err)
-	}
-
-	return nil
-}
-
-func generateModFiles(targetDir string, moduleName string, exposed []*serviceInfo, executor execute.Executor, p *api_v1.PluginPlaceholders) error {
-	if err := module.Init(targetDir, moduleName, executor); err != nil {
-		return fmt.Errorf("initialising module: %w", err)
-	}
-	if err := editModule(targetDir, exposed, executor, p); err != nil {
-		return fmt.Errorf("editting module: %w", err)
-	}
-	if err := module.Tidy(targetDir, executor); err != nil {
-		return fmt.Errorf("tidying module: %w", err)
-	}
-	return nil
-}
-
-func editModule(targetDir string, exposed []*serviceInfo, executor execute.Executor, p *api_v1.PluginPlaceholders) error {
-	for _, grpc := range exposed {
-		replacement := filepath.Join("../../..", p.ServicesDirectory, grpc.namespace, grpc.serviceName)
-
-		if err := module.Replace(targetDir, grpc.module, replacement, executor); err != nil {
-			return fmt.Errorf("editing go.mod file in %s: %w", targetDir, err)
-		}
-	}
-	return nil
-}
-
-//go:embed _templates/workflows/go.yml.tmpl
-var goWorkflow string
-
-func genWorkflow(p *api_v1.PluginPlaceholders) error {
-	workflowName := svc.WorkflowName(p.ServiceNamespace, p.ServiceName)
-
-	if err := service.Generate(goWorkflow, workflowDir, workflowName, p); err != nil {
-		return fmt.Errorf("generating service workflow: %w", err)
 	}
 
 	return nil
@@ -187,6 +145,43 @@ func generateGrpcHandlerCode(targetDir string, exposed []*serviceInfo) error {
 	lines = file.InsertIntoLines(lines, "func Register", body...)
 	if err = file.FromLines(handlersPath, lines); err != nil {
 		return fmt.Errorf("writing handlers for exposed services: %w", err)
+	}
+
+	return nil
+}
+
+func generateModFiles(targetDir string, moduleName string, exposed []*serviceInfo, executor execute.Executor, p *api_v1.PluginPlaceholders) error {
+	if err := module.Init(targetDir, moduleName, executor); err != nil {
+		return fmt.Errorf("initialising module: %w", err)
+	}
+	if err := editModule(targetDir, exposed, executor, p); err != nil {
+		return fmt.Errorf("editting module: %w", err)
+	}
+	if err := module.Tidy(targetDir, executor); err != nil {
+		return fmt.Errorf("tidying module: %w", err)
+	}
+	return nil
+}
+
+func editModule(targetDir string, exposed []*serviceInfo, executor execute.Executor, p *api_v1.PluginPlaceholders) error {
+	for _, grpc := range exposed {
+		replacement := filepath.Join("../../..", p.ServicesDirectory, grpc.namespace, grpc.serviceName)
+
+		if err := module.Replace(targetDir, grpc.module, replacement, executor); err != nil {
+			return fmt.Errorf("editing go.mod file in %s: %w", targetDir, err)
+		}
+	}
+	return nil
+}
+
+//go:embed _templates/workflows/go.yml.tmpl
+var goWorkflow string
+
+func GenWorkflow(p *api_v1.PluginPlaceholders) error {
+	workflowName := svc.WorkflowName(p.ServiceFqn, p.ServiceName)
+
+	if err := service.Generate(goWorkflow, workflowDir, workflowName, p); err != nil {
+		return fmt.Errorf("generating service workflow: %w", err)
 	}
 
 	return nil
