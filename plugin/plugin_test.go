@@ -13,7 +13,7 @@ func TestHandle_WithValidUsageInput_ReturnsUsageResponseString(t *testing.T) {
 	e := mocks.NewMockExecutor()
 	tw := mocks.NewMockTmplWriter()
 	result := plugin.Handle(CreateRequest(t, "usage"), &e, &tw)
-	expected := `{"Version":"0.1.0","Use":"gateway","Short":"manage gateway","Long":"manage gateway using a standard template","Example":"vision gateway create myGateway","Subcommands":["create"],"Flags":[],"RequiresConfig":false}`
+	expected := `{"Version":"0.1.0","Use":"gateway","Short":"manage gateway","Long":"manage gateway using a standard template","Example":"vision gateway create myGateway","Subcommands":["create"],"Flags":[],"RequiresConfig":true}`
 	assert.Equal(t, expected, result)
 }
 
@@ -80,7 +80,7 @@ func CreateRequest(t *testing.T, command string) string {
 		"ServiceVersionedNamespace":"",
 		"ServiceName":"",
 		"ServiceFqn":"",
-		"ServiceDirectory":"",
+		"ServiceDirectory":"test",
 		"InfraDirectory":"",
 		"ProtoPackage":""
 		}
