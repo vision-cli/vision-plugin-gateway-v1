@@ -30,7 +30,7 @@ var templateFiles embed.FS
 
 func Create(p *api_v1.PluginPlaceholders, executor execute.Executor, t tmpl.TmplWriter) error {
 
-	targetDir := filepath.Join(p.ServicesDirectory, p.ServiceNamespace, p.ServiceName)
+  targetDir := filepath.Join(p.ServicesDirectory, p.ServiceNamespace, p.ServiceName)
 
 	exposed, err := getExposedServices(p)
 	if err != nil {
@@ -108,7 +108,6 @@ func createTemplate(p *api_v1.PluginPlaceholders, targetDir string, t tmpl.TmplW
 	}
 
 	return nil
-
 }
 
 func generateGrpcHandlerCode(targetDir string, exposed []*serviceInfo) error {
