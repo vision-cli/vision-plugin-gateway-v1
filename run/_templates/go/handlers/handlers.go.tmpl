@@ -1,0 +1,15 @@
+package handlers
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/grpc"
+
+	"{{.ServiceFqn}}/config"
+)
+
+func Register(opts []grpc.DialOption, mux *runtime.ServeMux, conf *config.Config, ctx context.Context) error {
+	return nil
+}

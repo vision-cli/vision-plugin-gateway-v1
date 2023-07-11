@@ -29,7 +29,8 @@ const (
 var templateFiles embed.FS
 
 func Create(p *api_v1.PluginPlaceholders, executor execute.Executor, t tmpl.TmplWriter) error {
-	targetDir := filepath.Join(p.ServiceDirectory, p.ServiceFqn, p.ServiceName)
+
+	targetDir := filepath.Join(p.ServicesDirectory, p.ServiceNamespace, p.ServiceName)
 
 	exposed, err := getExposedServices(p)
 	if err != nil {
@@ -98,20 +99,16 @@ func getExposedServices(p *api_v1.PluginPlaceholders) ([]*serviceInfo, error) {
 }
 
 func createTemplate(p *api_v1.PluginPlaceholders, targetDir string, t tmpl.TmplWriter) error {
-	// if !cmd.Flags().Changed(config.FlagForce) {
-	// 	if file.Exists(targetDir) && !cli.Confirmed(
-	// 		fmt.Sprintf("A service already exists named %s. Do you wish to overwrite?", p.ServiceName),
-	// 	) {
-	// 		return fmt.Errorf("aborting due to existing service named %s", p.ServiceName)
-	// 	}
-	// }
+	if err := os.RemoveAll(targetDir); err != nil {
+		return fmt.Errorf("removing files from %s: %w", targetDir, err)
+	}
 
-	os.RemoveAll(targetDir)
 	if err := tmpl.GenerateFS(templateFiles, goTemplateDir, targetDir, p, false, t); err != nil {
 		return fmt.Errorf("generating the service structure from the template: %w", err)
 	}
 
 	return nil
+
 }
 
 func generateGrpcHandlerCode(targetDir string, exposed []*serviceInfo) error {
@@ -178,7 +175,7 @@ func editModule(targetDir string, exposed []*serviceInfo, executor execute.Execu
 var goWorkflow string
 
 func GenWorkflow(p *api_v1.PluginPlaceholders) error {
-	workflowName := svc.WorkflowName(p.ServiceFqn, p.ServiceName)
+	workflowName := svc.WorkflowName(p.ServiceNamespace, p.ServiceName)
 
 	if err := service.Generate(goWorkflow, workflowDir, workflowName, p); err != nil {
 		return fmt.Errorf("generating service workflow: %w", err)
