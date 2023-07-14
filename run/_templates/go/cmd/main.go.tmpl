@@ -1,0 +1,49 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"{{.ServiceFqn}}/config"
+	"{{.ServiceFqn}}/handlers"
+)
+
+func main() {
+	conf := mustLoadConfig()
+	err := runProxy(conf)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to run gateway service")
+	}
+}
+
+func runProxy(conf *config.Config) error {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	mux := runtime.NewServeMux()
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+
+	// Register multiple grpc services
+	err := handlers.Register(opts, mux, conf, ctx)
+	if err != nil {
+		return fmt.Errorf("failed to register grpc service %w", err)
+	}
+
+	log.Info().Msgf("{{.ServiceName | Pascal}} server listening at %s:%s", conf.ProxyHost, conf.ProxyPort)
+	return http.ListenAndServe(fmt.Sprintf("%s:%s", conf.ProxyHost, conf.ProxyPort), mux)
+}
+
+func mustLoadConfig() *config.Config {
+	conf, err := config.Load()
+	if err != nil {
+		log.Fatal().Err(err).Msg("error loading app config")
+	}
+	return conf
+}

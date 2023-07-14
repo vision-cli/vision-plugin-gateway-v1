@@ -1,0 +1,70 @@
+name: {{.ServiceNamespace}} {{.ServiceName}} service
+
+on:
+  push:
+    branches:
+      - {{.Branch}}
+    paths:
+      - .github/workflows/{{.ServiceNamespace}}-{{.ServiceName}}.yml
+      - services/{{.ServiceNamespace}}/{{.ServiceName}}/**
+    tags:
+      - services/{{.ServiceNamespace}}/{{.ServiceName}}/v[0-9]+\.[0-9]+\.[0-9]+
+
+  pull_request:
+    branches:
+      - {{.Branch}}
+    paths:
+      - .github/workflows/{{.ServiceNamespace}}-{{.ServiceName}}.yml
+      - services/{{.ServiceNamespace}}/{{.ServiceName}}/**
+
+defaults:
+  run:
+    working-directory: services/{{.ServiceNamespace}}/{{.ServiceName}}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: services/{{.ServiceNamespace}}/{{.ServiceName}}/go.mod
+
+      - name: Run tests
+        run: make test
+
+  deploy-dev:
+    name: Push image to registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    needs: test
+    if: github.ref == 'refs/heads/{{.Branch}}'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # exports GCLOUD_PROJECT and other aliases
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v0
+        with:
+          workload_identity_provider: {{`${{ secrets.GCP_WORKLOAD_IDP_DEV }}`}}
+          service_account: {{`${{ secrets.GCP_SERV_ACCOUNT_DEV }}`}}
+          token_format: access_token
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: Configure Docker to use gcloud credentials
+        run: gcloud --quiet auth configure-docker gcr.io
+
+      - name: Push image
+        run: make push-image
