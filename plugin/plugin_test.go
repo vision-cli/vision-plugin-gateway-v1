@@ -48,7 +48,7 @@ func TestHandle_WithInValidCommand_ReturnsErrorString(t *testing.T) {
 
 func TestHandle_WithValidRunInput_ReturnsRunResponseString(t *testing.T) {
 	// Capture current working directory
-	currentDir, err := os.Getwd()
+	originalDir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestHandle_WithValidRunInput_ReturnsRunResponseString(t *testing.T) {
 	// Ensure temp directory removed at the end
 	defer func() {
 		os.RemoveAll(tempDir)
-		err = os.Chdir(currentDir)
+		err = os.Chdir(originalDir)
 		if err != nil {
 			log.Fatal(err)
 		}
