@@ -47,6 +47,12 @@ func TestHandle_WithInValidCommand_ReturnsErrorString(t *testing.T) {
 }
 
 func TestHandle_WithValidRunInput_ReturnsRunResponseString(t *testing.T) {
+	// Capture current working directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	
 	// Create temporary directory
 	tempDir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -67,7 +73,13 @@ func TestHandle_WithValidRunInput_ReturnsRunResponseString(t *testing.T) {
 	}
 
 	// Ensure temp directory removed at the end
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		os.RemoveAll(tempDir)
+		err = os.Chdir(currentDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	e := mocks.NewMockExecutor()
 	tw := mocks.NewMockTmplWriter()
