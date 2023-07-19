@@ -1,6 +1,10 @@
 package plugin_test
 
 import (
+	"io/ioutil"
+	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -43,10 +47,48 @@ func TestHandle_WithInValidCommand_ReturnsErrorString(t *testing.T) {
 }
 
 func TestHandle_WithValidRunInput_ReturnsRunResponseString(t *testing.T) {
+	// Capture current working directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	// Create temporary directory
+	tempDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create ServicesDirectory as subdirectory of tempDir
+	servicesDir := filepath.Join(tempDir, "services")
+	err = os.Mkdir(servicesDir, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Change working directory to tempDir
+	err = os.Chdir(tempDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Ensure temp directory removed at the end
+	defer func() {
+		os.RemoveAll(tempDir)
+		err = os.Chdir(originalDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	e := mocks.NewMockExecutor()
 	tw := mocks.NewMockTmplWriter()
 	req := CreateRequest(t, "run")
 	req = strings.Replace(req, `"Args":[]`, `"Args":["create","mything"]`, 1)
+
+	// Set ServicesDirectory placeholder with servicesDir path
+	req = strings.Replace(req, `"ServicesDirectory":""`, `"ServicesDirectory":"`+servicesDir+`"`, 1)
+
 	result := plugin.Handle(req, &e, &tw)
 	expected := `{"Result":"SUCCESS!","Error":""}`
 	assert.Equal(t, expected, result)
@@ -80,7 +122,7 @@ func CreateRequest(t *testing.T, command string) string {
 		"ServiceVersionedNamespace":"",
 		"ServiceName":"",
 		"ServiceFqn":"",
-		"ServiceDirectory":"test",
+		"ServiceDirectory":"",
 		"InfraDirectory":"",
 		"ProtoPackage":""
 		}
