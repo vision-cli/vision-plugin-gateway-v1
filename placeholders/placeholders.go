@@ -35,6 +35,12 @@ func SetupPlaceholders(req api_v1.PluginRequest) (*api_v1.PluginPlaceholders, er
 		return nil, err
 	}
 	projectName := clearString(req.Args[ArgsNameIndex])
+	p.(*api_v1.PluginPlaceholders).ServiceName = projectName
+	p.(*api_v1.PluginPlaceholders).ServiceFqn, err = url.JoinPath(req.Placeholders.ServicesFqn, projectName)
+	if err != nil {
+		return nil, err
+	}
+
 	p.(*api_v1.PluginPlaceholders).ProjectRoot = projectName
 	p.(*api_v1.PluginPlaceholders).ProjectName = projectName
 	p.(*api_v1.PluginPlaceholders).ProjectDirectory = projectName

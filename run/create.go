@@ -4,9 +4,9 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	api_v1 "github.com/vision-cli/api/v1"
 
@@ -64,12 +64,12 @@ type serviceInfo struct {
 
 func getExposedServices(p *api_v1.PluginPlaceholders) ([]*serviceInfo, error) {
 	exposed := make([]*serviceInfo, 0)
-	if err := file.CreateDir(p.ServicesDirectory); err != nil {
-		return nil, fmt.Errorf("creating services directory: %w", err)
-	}
 
 	err := svc.WalkAll(p.ServicesDirectory, func(fullPath, namespace, serviceName string) error {
-		log.Println(fullPath, namespace, serviceName)
+		// skip the default namespace
+		if namespace == "default" {
+			return nil
+		}
 		protoPath := filepath.Join(fullPath, svc.ProtoDir)
 		matches, err := fs.Glob(os.DirFS(protoPath), "*.gw.go")
 		if err != nil {
@@ -121,26 +121,44 @@ func generateGrpcHandlerCode(targetDir string, exposed []*serviceInfo) error {
 		return fmt.Errorf("reading handlers.go contents to slice of strings: %w", err)
 	}
 
+	configPath := filepath.Join(targetDir, "config", "config.go")
+	configLines, err := file.ToLines(configPath)
+	if err != nil {
+		return fmt.Errorf("reading config.go contents to slice of strings: %w", err)
+	}
+
 	imports := []string{"\n"}
 	body := []string{}
+	configVars := []string{}
 	for _, grpc := range exposed {
 		alias := cases.Camel(grpc.namespace) + cases.Pascal(grpc.serviceName)
 		pkgImport := filepath.Join(grpc.module, svc.ProtoDir)
 
 		imports = append(imports, fmt.Sprintf(`	%sProto %q`, alias, pkgImport))
 
+		configVars = append(configVars, fmt.Sprintf("	%s%sHost  string `envconfig:\"%s_%s_HOST\" default:\"0.0.0.0\"`",
+			cases.Pascal(grpc.namespace), cases.Pascal(grpc.serviceName),
+			strings.ToUpper(grpc.namespace), strings.ToUpper(grpc.serviceName),
+		))
+
 		body = append(body, fmt.Sprintf(
-			`	if err := %sProto.Register%sHandlerFromEndpoint(ctx, mux, "%s-svc.%s:"+conf.GrpcPort, opts); err != nil {
+			`	if err := %sProto.Register%sHandlerFromEndpoint(ctx, mux, conf.%s%sHost+":"+conf.GrpcPort, opts); err != nil {
 		return fmt.Errorf("failed to register gRPC service %s in namespace %s: %%w", err)
 	}`,
-			alias, cases.Pascal(grpc.serviceName), grpc.serviceName, grpc.namespace, grpc.serviceName, grpc.namespace))
+			alias, cases.Pascal(grpc.serviceName), cases.Pascal(grpc.namespace), cases.Pascal(grpc.serviceName), grpc.serviceName, grpc.namespace))
 	}
 	body = append(body, "\n")
 
 	lines = file.InsertIntoLines(lines, "google.golang.org/grpc", imports...)
 	lines = file.InsertIntoLines(lines, "func Register", body...)
+	configLines = file.InsertIntoLines(configLines, "type Config struct {", configVars...)
+
 	if err = file.FromLines(handlersPath, lines); err != nil {
 		return fmt.Errorf("writing handlers for exposed services: %w", err)
+	}
+
+	if err = file.FromLines(configPath, configLines); err != nil {
+		return fmt.Errorf("writing config vars for exposed services: %w", err)
 	}
 
 	return nil

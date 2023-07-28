@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"{{.ServiceFqn}}/config"
@@ -27,11 +30,26 @@ func runProxy(conf *config.Config) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	systemRoots, err := x509.SystemCertPool()
+	if err != nil {
+		return err
+	}
+	cred := credentials.NewTLS(&tls.Config{
+		RootCAs: systemRoots,
+	})
+
 	mux := runtime.NewServeMux()
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	opts := []grpc.DialOption{}
+	if conf.GrpcPort == "8080" {
+		// running locally
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	} else {
+		// running in cloud run
+		opts = append(opts, grpc.WithTransportCredentials(cred))
+	}
 
 	// Register multiple grpc services
-	err := handlers.Register(opts, mux, conf, ctx)
+	err = handlers.Register(opts, mux, conf, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to register grpc service %w", err)
 	}

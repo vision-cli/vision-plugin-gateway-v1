@@ -27,5 +27,3 @@ require (
 	github.com/vision-cli/vision-plugin-service-v1 v0.0.0-20230703180916-490e0df2cf9f
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/vision-cli/api v0.3.0 => ../api

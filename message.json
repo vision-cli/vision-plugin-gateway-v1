@@ -1,0 +1,30 @@
+{
+  "Command": "run",
+  "Args": ["create", "gateway"],
+  "Flags": [],
+  "Placeholders": {
+    "ProjectRoot": "",
+    "ProjectName": "",
+    "ProjectDirectory": "",
+    "ProjectFqn": "",
+    "Registry": "",
+    "Remote": "",
+    "Branch": "",
+    "Version": "",
+    "ServicesFqn": "",
+    "ServicesDirectory": "services",
+    "GatewayServiceName": "",
+    "GatewayFqn": "",
+    "GraphqlServiceName": "",
+    "GraphqlFqn": "",
+    "LibsFqn": "",
+    "LibsDirectory": "",
+    "ServiceNamespace": "default",
+    "ServiceVersionedNamespace": "",
+    "ServiceName": "gateway",
+    "ServiceFqn": "",
+    "ServiceDirectory": "",
+    "InfraDirectory": "",
+    "ProtoPackage": ""
+  }
+}
