@@ -52,19 +52,22 @@ jobs:
         uses: actions/checkout@v3
 
       # exports GCLOUD_PROJECT and other aliases
-      - name: Authenticate to Google Cloud
-        id: auth
-        uses: google-github-actions/auth@v0
+      - name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v0"
         with:
-          workload_identity_provider: {{`${{ secrets.GCP_WORKLOAD_IDP_DEV }}`}}
-          service_account: {{`${{ secrets.GCP_SERV_ACCOUNT_DEV }}`}}
-          token_format: access_token
+          workload_identity_provider: {{`${{ secrets.DEV_GCP_WORKLOAD_IDP }}`}}
+          service_account: {{`${{ secrets.DEV_GCP_SERV_ACCOUNT }}`}}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v0
 
       - name: Configure Docker to use gcloud credentials
-        run: gcloud --quiet auth configure-docker gcr.io
+        run: gcloud --quiet auth configure-docker {{.RegistryServer}}
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: services/default/gcs-proxy/go.mod
 
       - name: Push image
         run: make push-image

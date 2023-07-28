@@ -1,10 +1,11 @@
 package placeholders
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 
-	"github.com/barkimedes/go-deepcopy"
 	api_v1 "github.com/vision-cli/api/v1"
 )
 
@@ -17,42 +18,41 @@ const (
 var nonAlphaRegex = regexp.MustCompile(`[^a-zA-Z]+`)
 
 type Placeholders struct {
-	Name string
+	RegistryServer string
+	*api_v1.PluginPlaceholders
 }
 
-func SetupPlaceholders(req api_v1.PluginRequest) (*api_v1.PluginPlaceholders, error) {
-	// setup your placeholders here
-	// you can also deepcopy the Placeholders in the plugin request and use it
-	// this is just an example:
-	// name := clearString(req.Args[ArgsNameIndex])
-	// return &Placeholders{
-	// 	Name: name,
-	// }, nil
-
+func SetupPlaceholders(req api_v1.PluginRequest) (*Placeholders, error) {
 	var err error
-	p, err := deepcopy.Anything(&req.Placeholders)
-	if err != nil {
-		return nil, err
+
+	registryComponents := strings.Split(req.Placeholders.Registry, "/")
+	if len(registryComponents) == 0 {
+		return nil, fmt.Errorf("invalid registry server: %s", req.Placeholders.Registry)
 	}
-	projectName := clearString(req.Args[ArgsNameIndex])
-	p.(*api_v1.PluginPlaceholders).ServiceName = projectName
-	p.(*api_v1.PluginPlaceholders).ServiceFqn, err = url.JoinPath(req.Placeholders.ServicesFqn, projectName)
-	if err != nil {
-		return nil, err
+	p := &Placeholders{
+		RegistryServer:     registryComponents[0],
+		PluginPlaceholders: &req.Placeholders,
 	}
 
-	p.(*api_v1.PluginPlaceholders).ProjectRoot = projectName
-	p.(*api_v1.PluginPlaceholders).ProjectName = projectName
-	p.(*api_v1.PluginPlaceholders).ProjectDirectory = projectName
-	p.(*api_v1.PluginPlaceholders).ProjectFqn, err = url.JoinPath(req.Placeholders.Remote, projectName)
+	projectName := clearString(req.Args[ArgsNameIndex])
+	p.ServiceName = projectName
+	p.ServiceFqn, err = url.JoinPath(req.Placeholders.ServicesFqn, projectName)
 	if err != nil {
 		return nil, err
 	}
-	p.(*api_v1.PluginPlaceholders).LibsFqn, err = url.JoinPath(req.Placeholders.Remote, projectName, "libs")
+	p.ProjectRoot = projectName
+	p.ProjectName = projectName
+	p.ProjectDirectory = projectName
+	p.ProjectFqn, err = url.JoinPath(req.Placeholders.Remote, projectName)
 	if err != nil {
 		return nil, err
 	}
-	return p.(*api_v1.PluginPlaceholders), nil
+	p.LibsFqn, err = url.JoinPath(req.Placeholders.Remote, projectName, "libs")
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+
 }
 
 func clearString(str string) string {

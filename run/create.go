@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	api_v1 "github.com/vision-cli/api/v1"
+	"github.com/vision-cli/vision-plugin-gateway-v1/placeholders"
 
 	"github.com/vision-cli/common/cases"
 	"github.com/vision-cli/common/execute"
@@ -28,7 +28,7 @@ const (
 //go:embed all:_templates
 var templateFiles embed.FS
 
-func Create(p *api_v1.PluginPlaceholders, executor execute.Executor, t tmpl.TmplWriter) error {
+func Create(p *placeholders.Placeholders, executor execute.Executor, t tmpl.TmplWriter) error {
 
 	targetDir := filepath.Join(p.ServicesDirectory, p.ServiceNamespace, p.ServiceName)
 
@@ -62,7 +62,7 @@ type serviceInfo struct {
 	module      string
 }
 
-func getExposedServices(p *api_v1.PluginPlaceholders) ([]*serviceInfo, error) {
+func getExposedServices(p *placeholders.Placeholders) ([]*serviceInfo, error) {
 	exposed := make([]*serviceInfo, 0)
 
 	err := svc.WalkAll(p.ServicesDirectory, func(fullPath, namespace, serviceName string) error {
@@ -98,7 +98,7 @@ func getExposedServices(p *api_v1.PluginPlaceholders) ([]*serviceInfo, error) {
 	return exposed, nil
 }
 
-func createTemplate(p *api_v1.PluginPlaceholders, targetDir string, t tmpl.TmplWriter) error {
+func createTemplate(p *placeholders.Placeholders, targetDir string, t tmpl.TmplWriter) error {
 	if err := os.RemoveAll(targetDir); err != nil {
 		return fmt.Errorf("removing files from %s: %w", targetDir, err)
 	}
@@ -164,7 +164,7 @@ func generateGrpcHandlerCode(targetDir string, exposed []*serviceInfo) error {
 	return nil
 }
 
-func generateModFiles(targetDir string, moduleName string, exposed []*serviceInfo, executor execute.Executor, p *api_v1.PluginPlaceholders) error {
+func generateModFiles(targetDir string, moduleName string, exposed []*serviceInfo, executor execute.Executor, p *placeholders.Placeholders) error {
 	if err := module.Init(targetDir, moduleName, executor); err != nil {
 		return fmt.Errorf("initialising module: %w", err)
 	}
@@ -177,7 +177,7 @@ func generateModFiles(targetDir string, moduleName string, exposed []*serviceInf
 	return nil
 }
 
-func editModule(targetDir string, exposed []*serviceInfo, executor execute.Executor, p *api_v1.PluginPlaceholders) error {
+func editModule(targetDir string, exposed []*serviceInfo, executor execute.Executor, p *placeholders.Placeholders) error {
 	for _, grpc := range exposed {
 		replacement := filepath.Join("../../..", p.ServicesDirectory, grpc.namespace, grpc.serviceName)
 
@@ -191,7 +191,7 @@ func editModule(targetDir string, exposed []*serviceInfo, executor execute.Execu
 //go:embed _templates/workflows/go.yml.tmpl
 var goWorkflow string
 
-func GenWorkflow(p *api_v1.PluginPlaceholders) error {
+func GenWorkflow(p *placeholders.Placeholders) error {
 	workflowName := svc.WorkflowName(p.ServiceNamespace, p.ServiceName)
 
 	if err := service.Generate(goWorkflow, workflowDir, workflowName, p); err != nil {
